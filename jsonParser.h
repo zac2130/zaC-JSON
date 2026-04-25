@@ -60,18 +60,54 @@ JSONObject *parseJSON (FILE *file) {
 
 	printf("root->ObjectData = %X\n", root->ObjectData);
 
-	int i = 0;
+	int index = 0;
+	int placeholder = 0;
 	// while character is not nul, string end
-	while(jsonFile[i] != 0){
-		if (jsonFile[i] == '"'){
+	while(jsonFile[index] != 0){
+		if (jsonFile[index] == '"'){
+			index++; // +1 to get the character after the "
+			placeholder = index; 
 			if (root->ObjectData == NULL){
 				root->ObjectData = malloc(sizeof(JSONKeyValue));
 			}else{
-				root->ObjectData = realloc(sizeof(root->ObjectData) + sizeof(JSONKeyValue));
+				root->ObjectData = realloc(root->ObjectData, sizeof(root->ObjectData) + sizeof(JSONKeyValue));
 			}
-			while (jsonFile[i] != '"'){
+			while (jsonFile[index] != '"'){
+				index++;
+			}
+			char *key = malloc(index - placeholder);
+			for (int j = 0; j <= index - placeholder; j++){
+				key[j] = jsonFile[placeholder + j];
+			}
+			printf("got key: \"%s\"", key);
+
+			// advance to colomn
+			while (jsonFile[index] != ':'){
+				index++;
+			}
+
+			// advance to key
+			while ((jsonFile[index] | 0b11110000) != 0 && jsonFile[index] != ' ') { // first check if ascii printable character, second check if not space
+				switch (jsonFile[index]){
+					case '{':
+						// child JSON object
+						break;
+					case '[':
+						// array, can be any type
+						break;
+					case '"':
+						// string, standard key/value string
+						break;
+					case 'n':
+						// null
+						break;
+					default:
+						// number, need to identify int or float
+						break;
+				}
 			}
 		}
+		index++;
 	}
 
 
