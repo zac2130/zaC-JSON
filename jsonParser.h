@@ -75,18 +75,25 @@ JSONObject *parseJSON (FILE *file) {
 			while (jsonFile[index] != '"'){
 				index++;
 			}
+
 			char *key = malloc(index - placeholder);
-			for (int j = 0; j <= index - placeholder; j++){
+
+			// fills a char *key with the string of a key to put later in a JSONKeyValue structur
+			for (int j = 0; j < index - placeholder; j++){
+				// stops at index - 1, index is '"'
 				key[j] = jsonFile[placeholder + j];
 			}
-			printf("got key: \"%s\"", key);
+			printf("got key: \"%s\"\n", key);
 
 			// advance to colomn
 			while (jsonFile[index] != ':'){
 				index++;
 			}
+			// creat JSONKeyValue * to fill
+			JSONKeyValue *keyValue = malloc(sizeof(JSONKeyValue *));
+			keyValue->key = key;
 
-			// advance to key
+			// advance to value of key
 			while ((jsonFile[index] | 0b11110000) != 0 && jsonFile[index] != ' ') { // first check if ascii printable character, second check if not space
 				switch (jsonFile[index]){
 					case '{':
