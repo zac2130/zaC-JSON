@@ -65,7 +65,8 @@ JSONObject *parseJSON (FILE *file) {
 	// while character is not nul, string end
 	while(jsonFile[index] != 0){
 		if (jsonFile[index] == '"'){
-			index++; // +1 to get the character after the "
+			printf("found start of key\n");
+			index++; // move beyond the first "
 			placeholder = index; 
 			if (root->ObjectData == NULL){
 				root->ObjectData = malloc(sizeof(JSONKeyValue));
@@ -75,6 +76,7 @@ JSONObject *parseJSON (FILE *file) {
 			while (jsonFile[index] != '"'){
 				index++;
 			}
+			printf("found end of key\n");
 
 			JSONKeyValue *keyValue = malloc(sizeof(JSONKeyValue *));
 
@@ -91,26 +93,57 @@ JSONObject *parseJSON (FILE *file) {
 			while (jsonFile[index] != ':'){
 				index++;
 			}
+			index++;
+			printf("found colomn\n");
 
 			// advance to value of key
-			while ((jsonFile[index] | 0b11110000) != 0 && jsonFile[index] != ' ') { // first check if ascii printable character, second check if not space
-				switch (jsonFile[index]){
-					case '{':
-						// child JSON object
-						break;
-					case '[':
-						// array, can be any type
-						break;
-					case '"':
-						// string, standard key/value string
-						break;
-					case 'n':
-						// null
-						break;
-					default:
-						// number, need to identify int or float
-						break;
+			while ((jsonFile[index] | 0b11110000) == 0) { // while not ascii printable
+				index++;
 				}
+			printf("found start of value: %c\n", jsonFile[index]);
+			
+			switch (jsonFile[index]){
+				case '{':
+					// child JSON object
+					printf("Value is a JSON object\n");
+					keyValue->type = JSONobject;
+					break;
+				case '[':
+					// array, can be any type
+					printf("Value is a JSON array\n");
+					keyValue->type = JSONarray;
+					break;
+				case '"':
+					// string, standard key/value string
+					printf("Value is a string\n");
+					keyValue->type = JSONstring;
+
+					index++; // move beyond the first "
+					placeholder = index;
+					while (jsonFile[index] != '"'){
+						index++;
+					}
+					printf("found end of value\n");
+
+					keyValue->value = malloc(index - placeholder);
+
+					// fills a char *Value with the string of a key to put later in a JSONKeyValue structur
+					for (int j = 0; j < index - placeholder; j++){
+						// stops at index - 1, index is '"'
+						*((char *)keyValue->value + j) = jsonFile[placeholder + j];
+					}
+					printf("value is string: \"%s\"\n", keyValue->value);
+					break;
+				case 'n':
+					// null
+					printf("Value is null\n");
+					keyValue->type = JSONnull;
+					break;
+				default:
+					// number, need to identify int or float
+					printf("Value is a number int, float or bool\n");
+					keyValue->type = JSONnumber;
+					break;
 			}
 		}
 		index++;
