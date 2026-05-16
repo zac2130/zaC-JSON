@@ -4,15 +4,14 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#define PTR_SIZE sizeof(int *)
 
-#define PTRSIZE sizeof(int *)
-
-#define JSONSTRING 0
-#define JSONNUMBER 1
-#define JSONOBJECT 2
-#define JSONARRAY 3
-#define JSONBOOLEAN 4
-#define JSONNULL 5
+#define JSON_STRING 0
+#define JSON_NUMBER 1
+#define JSON_OBJECT 2
+#define JSON_ARRAY 3
+#define JSON_BOOLEAN 4
+#define JSON_NULL 5
 
 /* a JSON value has 6 possible data types:
  * 	a string
@@ -24,13 +23,20 @@
  *
 */
 
-typedef int bool;
+typedef struct JSONObject JSONObject;
 
 typedef struct JSONKeyValue {
 	char *key;
 
-	uint8_t type;
-	void *value;
+	uint8_t valueType;
+	union{
+		char *JSONString;
+		long JSONInt;
+		double JSONFloat;
+		JSONObject *JSONObject;
+		char **JSONArray;
+		bool *JSONBool;
+	}value;
 }JSONKeyValue;
 
 typedef struct JSONObject {
@@ -49,10 +55,11 @@ bool *JSONTypeBool;
 
 
 /* define a publically accessible pointer to the root of the JSON file */
-JSONObject *root = malloc(PTRSIZE);
+JSONObject *root;
 
 void InitRootObject(){
 	extern JSONObject *root;
+	root = malloc(PTR_SIZE);
 	root->key = malloc(5);
 	root->key = "root"; /* hard coded key assosiated with the root object in given file */
 }
@@ -65,9 +72,9 @@ static void skipTo(char character, int *ptr, char *array){
 }
 
 static void addKeyValuePair(JSONKeyValue *keyValuePairArray) {
-	if (keyValuePairArray == NULL) keyValuePairArray = malloc(PTRSIZE);
+	if (keyValuePairArray == NULL) keyValuePairArray = malloc(PTR_SIZE);
 	else {
-	       keyValuePairArray = realloc(keyValuePairArray, sizeof(keyValuePairArray + ));
+	       keyValuePairArray = realloc(keyValuePairArray, sizeof(keyValuePairArray + PTR_SIZE));
 	       if (keyValuePairArray == NULL) {
 		       printf("Failed to reallocate key/value pair array\n\n");
 		       return;
@@ -76,7 +83,7 @@ static void addKeyValuePair(JSONKeyValue *keyValuePairArray) {
 }
 
 JSONObject *spawnJSON(char* key, JSONObject *parent) {
-	JSONObject *child = malloc(PTRSIZE);
+	JSONObject *child = malloc(PTR_SIZE);
 
 	if (child == NULL) printf("Failed JSON child allocation\n");
 	else{
@@ -121,13 +128,13 @@ JSONObject *parseJSON (FILE *file) {
 			placeholder = index; 
 
 			/* going to initiate an array of 5 and resize by +5 each time it would overflow */
-			CurrentObject->ObjectData = realloc(CurrentObject->ObjectData, sizeof(CurrentObject->ObjectData) + sizeof(JSONKeyValue));
+			CurrentObject->ObjectData = realloc(CurrentObject->ObjectData, sizeof(CurrentObject->ObjectData) + PTR_SIZE);
 
 			skipTo('"', &index, jsonFile); // skip to " character
 
 			printf("found end of key\n");
 
-			JSONKeyValue *keyValue = malloc(sizeof(JSONKeyValue *));
+			JSONKeyValue *keyValue = malloc(PTR_SIZE);
 			addKeyValuePair(keyValue);
 
 			keyValue->key = malloc(index - placeholder + 1); /* nul terminated string */
@@ -154,19 +161,19 @@ JSONObject *parseJSON (FILE *file) {
 				case '{':
 					// child JSON object
 
-					keyValue->value = spawnJSON(keyValue->key, CurrentObject); /* need a function to add one object at a time independent of current size */
+					keyValue->value.JSONObject = spawnJSON(keyValue->key, CurrentObject); /* need a function to add one object at a time independent of current size */
 					printf("Value is a JSON object\n");
-					keyValue->type = JSONOBJECT;
+					keyValue->valueType = JSON_OBJECT;
 					break;
 				case '[':
 					// array, can be any type
 					printf("Value is a JSON array\n");
-					keyValue->type = JSONARRAY;
+					keyValue->valueType = JSON_ARRAY;
 					break;
 				case '"':
 					// string, standard key/value string
 					printf("Value is a string\n");
-					keyValue->type = JSONSTRING;
+					keyValue->valueType = JSON_STRING;
 
 					index++; // move beyond the first "
 					placeholder = index;
@@ -174,26 +181,26 @@ JSONObject *parseJSON (FILE *file) {
 
 					printf("found end of value\n");
 
-					keyValue->value = malloc(index - placeholder + 1); /* size of the character value plus nul */
+					keyValue->value.JSONString = malloc(index - placeholder + 1); /* size of the character value plus nul */
 
 					// fills a char *Value with the string of a key to put later in a JSONKeyValue structur
 					for (int j = 0; j < index - placeholder; j++)
 						// stops at index - 1, index is '"'
-						*((char *)keyValue->value + j) = jsonFile[placeholder + j];
+						keyValue->value.JSONString[j] = jsonFile[placeholder + j];
 
-					*((char *)keyValue->value + index - placeholder) = '\0';
+					keyValue->value.JSONString[index - placeholder] = '\0';
 
-					printf("value is string: \"%s\"\n", keyValue->value);
+					printf("value is string: \"%s\"\n", keyValue->value.JSONString);
 					break;
 				case 'n':
 					// null
 					printf("Value is null\n");
-					keyValue->type = JSONNULL;
+					keyValue->valueType = JSON_NULL;
 					break;
 				default:
 					// number, need to identify int or float
 					printf("Value is a number int, float or bool\n");
-					keyValue->type = JSONNUMBER;
+					keyValue->valueType = JSON_NUMBER;
 					break;
 			}
 			printf("\n");
